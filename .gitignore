@@ -101,10 +101,7 @@ sysinfo.txt
 
 # Unity build directories (disabled during WebGL deployment)
 /[Bb]uilds/
-##WEBGL_DEPLOY_IGNORE_START##
-/[Bb]uild/
-Build/
-##WEBGL_DEPLOY_IGNORE_END##
+# (Unity development files removed for WebGL deployment)
 
 # Other build outputs (always ignored)
 *.apk
@@ -121,17 +118,7 @@ firebase-config.json
 
 # Unity Settings (TEMPLATE ONLY - REMOVED IN DEPLOYMENT)  
 # -----------------------------------------------------------------
-##WEBGL_DEPLOY_IGNORE_START##
-# Only ignore the main ProjectSettings file that can cause conflicts
-ProjectSettings/ProjectSettings.asset
-
-# CRITICAL: Allow creator PayPal configuration to be committed
-!Assets/U3D_SDK/Resources/U3DCreatorData.asset
-# CRITICAL: Allow U3D prefabs to be committed
-!Assets/U3D/Prefabs/**/*
-# CRITICAL: Allow U3D assets to be committed  
-!Assets/U3D/U3D_Assets/**/*.asset
-##WEBGL_DEPLOY_IGNORE_END##
+# (Unity development files removed for WebGL deployment)
 
 # Chunk File Handling (FOR LARGE FILE SUPPORT)
 # -----------------------------------------------------------------
