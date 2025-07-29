@@ -423,11 +423,11 @@
             }
 
             var buildUrl = "Build";
-            var loaderUrl = buildUrl + "/942183c39ece8c5e9c009183590412b9.loader.js?v=1753764076941";
+            var loaderUrl = buildUrl + "/942183c39ece8c5e9c009183590412b9.loader.js?v=1753765721962";
             var config = {
-                dataUrl: buildUrl + "/ec9c46e0ffc621bed5cdf7995873beb2.data?v=1753764076941",
-                frameworkUrl: buildUrl + "/b013af16a99fd18e3f39a9d5ee1bca0c.framework.js?v=1753764076941",
-                codeUrl: buildUrl + "/18dabe18e0b9b2839048fd4fe1610053.wasm?v=1753764076941",
+                dataUrl: buildUrl + "/ec9c46e0ffc621bed5cdf7995873beb2.data?v=1753765721962",
+                frameworkUrl: buildUrl + "/b013af16a99fd18e3f39a9d5ee1bca0c.framework.js?v=1753765721962",
+                codeUrl: buildUrl + "/18dabe18e0b9b2839048fd4fe1610053.wasm?v=1753765721962",
                 streamingAssetsUrl: "StreamingAssets",
                 companyName: "spacedolphin",
                 productName: "spacedolphin's Unity Experience",
@@ -512,10 +512,6 @@
             
             document.body.appendChild(script);
         }
-
-        // ===== UPDATED DUAL TRANSACTION SYSTEM - SERVER-SIDE PROCESSING =====        
-        // Global payment data
-        let currentPaymentData = null;
         
         // Main dual transaction function called by Unity
         window.UnityStartDualTransaction = function(itemName, itemDescription, totalAmount, transactionId) {
