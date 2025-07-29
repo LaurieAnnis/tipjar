@@ -423,11 +423,11 @@
             }
 
             var buildUrl = "Build";
-            var loaderUrl = buildUrl + "/75f5af01145741b700bff9f65229e16e.loader.js?v=1753585768268";
+            var loaderUrl = buildUrl + "/942183c39ece8c5e9c009183590412b9.loader.js?v=1753764076941";
             var config = {
-                dataUrl: buildUrl + "/d6dcc3c2b6614135e7e50d639c9b1096.data?v=1753585768268",
-                frameworkUrl: buildUrl + "/b013af16a99fd18e3f39a9d5ee1bca0c.framework.js?v=1753585768268",
-                codeUrl: buildUrl + "/4b1508a3ef760dfc62d3975d85e45420.wasm?v=1753585768268",
+                dataUrl: buildUrl + "/ec9c46e0ffc621bed5cdf7995873beb2.data?v=1753764076941",
+                frameworkUrl: buildUrl + "/b013af16a99fd18e3f39a9d5ee1bca0c.framework.js?v=1753764076941",
+                codeUrl: buildUrl + "/18dabe18e0b9b2839048fd4fe1610053.wasm?v=1753764076941",
                 streamingAssetsUrl: "StreamingAssets",
                 companyName: "spacedolphin",
                 productName: "spacedolphin's Unity Experience",
@@ -513,17 +513,21 @@
             document.body.appendChild(script);
         }
 
-        // ===== DUAL TRANSACTION SYSTEM (NO LOGIN REQUIRED) WITH GA4 TRACKING =====
+        // ===== UPDATED DUAL TRANSACTION SYSTEM - SERVER-SIDE PROCESSING =====        
+        // Global payment data
+        let currentPaymentData = null;
+        
+        // Main dual transaction function called by Unity
         window.UnityStartDualTransaction = function(itemName, itemDescription, totalAmount, transactionId) {
-            console.log('💳 Starting dual transaction:', {
+            console.log('🚀 Starting server-side dual transaction:', {
                 itemName,
                 itemDescription,
-                totalAmount,
+                totalAmount: parseFloat(totalAmount),
                 transactionId
             });
 
-            // ADDED: Track payment initiation
-            gtag('event', 'begin_checkout', {
+            // Track payment initiation
+            gtag('event', 'payment_initiated', {
                 currency: 'USD',
                 value: parseFloat(totalAmount),
                 item_name: itemName,
@@ -534,23 +538,40 @@
             });
 
             try {
-                // Store payment data
+                const total = parseFloat(totalAmount);
+                const creatorEmail = environment.creatorPayPalEmail || getCreatorEmailFromURL();
+
+                if (!creatorEmail) {
+                    console.error('❌ Creator PayPal email not found');
+                    showPaymentStatus('Creator payment email not configured', 'error');
+                    if (unityInstance) {
+                        unityInstance.SendMessage('PayPalDualTransaction', 'OnPaymentComplete', 'false');
+                    }
+                    return;
+                }
+
+                // Store payment data globally
                 currentPaymentData = {
                     itemName,
                     itemDescription,
-                    totalAmount: parseFloat(totalAmount),
+                    totalAmount: total,
                     transactionId,
-                    creatorAmount: Math.round(parseFloat(totalAmount) * 0.95 * 100) / 100,
-                    platformAmount: Math.round(parseFloat(totalAmount) * 0.05 * 100) / 100
+                    creatorEmail,
+                    contentId: 'unity_content_' + transactionId
                 };
 
-                // Show payment modal with breakdown
-                showPaymentModal();
+                console.log('💰 Creating dual transaction for:', {
+                    total: `$${total.toFixed(2)}`,
+                    creator: `95% → ${creatorEmail}`,
+                    platform: `5% → laurie@unreality3d.com`
+                });
+
+                // Create dual PayPal orders via server-side function
+                createServerSideDualTransaction();
 
             } catch (error) {
                 console.error('❌ Dual transaction setup failed:', error);
                 
-                // ADDED: Track payment setup failure
                 gtag('event', 'payment_setup_failed', {
                     error_message: error.message,
                     creator_name: environment.creatorUsername || 'platform',
@@ -563,224 +584,289 @@
             }
         };
 
-        function showPaymentModal() {
-            if (!currentPaymentData) return;
+        // Create server-side dual transaction
+        async function createServerSideDualTransaction() {
+            try {
+                if (!functions) {
+                    throw new Error('Firebase Functions not available');
+                }
 
-            const modal = document.getElementById('paymentModal');
-            const detailsDiv = document.getElementById('payment-details');
-            const buttonContainer = document.getElementById('paypal-button-container');
+                showDualPaymentModal('Creating PayPal orders...', 'info');
 
-            // Clear previous content
-            detailsDiv.innerHTML = '';
-            buttonContainer.innerHTML = '';
+                // Call server-side function to create dual PayPal orders
+                const createPaymentOrder = functions.httpsCallable('createPaymentOrder');
+                const result = await createPaymentOrder({
+                    contentId: currentPaymentData.contentId,
+                    itemName: currentPaymentData.itemName,
+                    itemDescription: currentPaymentData.itemDescription,
+                    totalAmount: currentPaymentData.totalAmount,
+                    creatorEmail: currentPaymentData.creatorEmail
+                });
 
-            // Create payment details
-            detailsDiv.innerHTML = `
-                <h3>${currentPaymentData.itemName}</h3>
-                <p>${currentPaymentData.itemDescription}</p>
-                
-                <div class="payment-breakdown">
-                    <h4>💰 Payment Breakdown</h4>
-                    <div class="split-row">
-                        <span>💎 Creator (95%):</span>
-                        <strong>$${currentPaymentData.creatorAmount.toFixed(2)}</strong>
-                    </div>
-                    <div class="split-row">
-                        <span>🏗️ Platform (5%):</span>
-                        <span>$${currentPaymentData.platformAmount.toFixed(2)}</span>
-                    </div>
-                    <div class="split-row split-total">
-                        <strong>Total:</strong>
-                        <strong>$${currentPaymentData.totalAmount.toFixed(2)}</strong>
-                    </div>
-                </div>
-                
-                <div class="creator-info">
-                    <p style="margin: 0;">
-                        <strong>🔒 Secure Dual Transaction</strong><br>
-                        Your payment automatically splits between creator and platform.
-                        No account creation required!
-                    </p>
-                </div>
-            `;
-
-            // Create PayPal button
-            paypal.Buttons({
-                createOrder: function(data, actions) {
-                    return actions.order.create({
-                        purchase_units: [{
-                            amount: {
-                                value: currentPaymentData.totalAmount.toFixed(2)
-                            },
-                            description: `${currentPaymentData.itemName} - Unreality3D Creator Content`
-                        }],
-                        application_context: {
-                            brand_name: 'Unreality3D',
-                            user_action: 'PAY_NOW'
-                        }
+                if (result.data.success) {
+                    console.log('✅ Server-side dual orders created:', {
+                        creatorOrderId: result.data.creatorOrderId,
+                        platformOrderId: result.data.platformOrderId
                     });
-                },
+
+                    // Store the order information
+                    currentPaymentData.dualTransactionId = result.data.dualTransactionId;
+                    currentPaymentData.creatorOrderId = result.data.creatorOrderId;
+                    currentPaymentData.platformOrderId = result.data.platformOrderId;
+                    currentPaymentData.creatorAmount = result.data.creatorAmount;
+                    currentPaymentData.platformAmount = result.data.platformAmount;
+
+                    // Show PayPal checkout interface
+                    showDualPaymentModal('Ready for payment', 'success');
+                    initializePayPalCheckout(result.data.creatorOrderId);
+
+                } else {
+                    throw new Error('Server failed to create dual orders');
+                }
+
+            } catch (error) {
+                console.error('❌ Failed to create server-side dual transaction:', error);
+                showDualPaymentModal('Failed to create payment orders', 'error');
                 
-                onApprove: async function(data, actions) {
-                    try {
-                        // Capture the payment
-                        const order = await actions.order.capture();
-                        console.log('✅ PayPal payment captured:', order);
-                        
-                        // ADDED: Track successful payment
-                        gtag('event', 'purchase', {
-                            transaction_id: currentPaymentData.transactionId,
-                            value: currentPaymentData.totalAmount,
-                            currency: 'USD',
-                            creator_name: environment.creatorUsername || 'platform',
-                            project_name: environment.projectName || 'main',
-                            item_name: currentPaymentData.itemName,
-                            creator_amount: currentPaymentData.creatorAmount,
-                            platform_amount: currentPaymentData.platformAmount
-                        });
-                        
-                        // Process dual transaction via Firebase (if available)
-                        if (functions) {
-                            await processDualTransaction(order);
-                        } else {
-                            // Fallback: notify Unity of success
-                            showPaymentStatus('✅ Payment successful!', 'success');
-                            setTimeout(() => {
-                                closePaymentModal();
-                                if (unityInstance) {
-                                    unityInstance.SendMessage('PayPalDualTransaction', 'OnPaymentComplete', 'true');
-                                }
-                            }, 2000);
-                        }
-                        
-                    } catch (error) {
-                        console.error('❌ Payment processing failed:', error);
-                        
-                        // ADDED: Track payment failure
-                        gtag('event', 'payment_failed', {
-                            error_message: error.message,
-                            creator_name: environment.creatorUsername || 'platform',
-                            project_name: environment.projectName || 'main',
-                            transaction_id: currentPaymentData.transactionId
-                        });
-                        
-                        showPaymentStatus('❌ Payment failed: ' + error.message, 'error');
-                    }
-                },
-                
-                onError: function(err) {
-                    console.error('❌ PayPal error:', err);
-                    
-                    // ADDED: Track PayPal errors
-                    gtag('event', 'paypal_error', {
-                        error_details: JSON.stringify(err),
-                        creator_name: environment.creatorUsername || 'platform',
-                        project_name: environment.projectName || 'main'
-                    });
-                    
-                    showPaymentStatus('❌ Payment error occurred', 'error');
-                },
-                
-                onCancel: function(data) {
-                    console.log('⚠️ Payment cancelled');
-                    
-                    // ADDED: Track payment cancellation
-                    gtag('event', 'payment_cancelled', {
-                        creator_name: environment.creatorUsername || 'platform',
-                        project_name: environment.projectName || 'main',
-                        transaction_id: currentPaymentData.transactionId
-                    });
-                    
+                setTimeout(() => {
                     closePaymentModal();
                     if (unityInstance) {
                         unityInstance.SendMessage('PayPalDualTransaction', 'OnPaymentComplete', 'false');
                     }
-                }
-                
-            }).render('#paypal-button-container');
-
-            modal.style.display = 'flex';
+                }, 3000);
+            }
         }
 
-        async function processDualTransaction(paypalOrder) {
-            try {
-                showPaymentStatus('🔄 Processing dual transaction...', 'info');
-                
-                // Call Firebase function for dual transaction
-                const createDualTransaction = functions.httpsCallable('createDualTransaction');
-                const result = await createDualTransaction({
-                    itemName: currentPaymentData.itemName,
-                    itemDescription: currentPaymentData.itemDescription,
-                    totalAmount: currentPaymentData.totalAmount,
-                    transactionId: currentPaymentData.transactionId,
-                    paypalOrderId: paypalOrder.id
-                });
+        // Show payment modal
+        function showDualPaymentModal(statusMessage, statusType) {
+            // Remove any existing modal
+            const existingModal = document.getElementById('paymentModal');
+            if (existingModal) {
+                existingModal.remove();
+            }
 
-                if (result.data && result.data.success) {
-                    console.log('✅ Dual transaction completed:', result.data);
+            const data = currentPaymentData;
+            
+            // Create the modal
+            const modalHTML = `
+                <div id="paymentModal" style="
+                    position: fixed;
+                    top: 0;
+                    left: 0;
+                    width: 100%;
+                    height: 100%;
+                    background: rgba(0, 0, 0, 0.8);
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    z-index: 10000;
+                    font-family: Arial, sans-serif;
+                ">
+                    <div id="paymentContent" style="
+                        background: white;
+                        border-radius: 10px;
+                        padding: 30px;
+                        max-width: 500px;
+                        width: 90%;
+                        text-align: center;
+                        box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+                    ">
+                        <h2 style="margin-top: 0; color: #333; font-size: 24px;">${data.itemName}</h2>
+                        <p style="color: #666; margin: 15px 0; font-size: 16px;">${data.itemDescription}</p>
+                        
+                        <!-- Payment Summary -->
+                        <div style="
+                            background: #f8f9fa;
+                            padding: 20px;
+                            border-radius: 8px;
+                            margin: 20px 0;
+                            border-left: 4px solid #0070ba;
+                        ">
+                            <div style="font-size: 28px; font-weight: bold; color: #0070ba; margin-bottom: 10px;">
+                                $${data.totalAmount ? data.totalAmount.toFixed(2) : '0.00'}
+                            </div>
+                            <div style="font-size: 14px; color: #666; line-height: 1.5;">
+                                <div style="margin: 5px 0;">
+                                    <strong>Creator receives:</strong> $${data.creatorAmount ? data.creatorAmount.toFixed(2) : (data.totalAmount * 0.95).toFixed(2)} (95%)
+                                </div>
+                                <div style="margin: 5px 0;">
+                                    <strong>Platform fee:</strong> $${data.platformAmount ? data.platformAmount.toFixed(2) : (data.totalAmount * 0.05).toFixed(2)} (5%)
+                                </div>
+                                <div style="margin-top: 10px; font-size: 12px; opacity: 0.8;">
+                                    Server-side dual transaction processing
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- PayPal Button Container -->
+                        <div id="paypal-button-container" style="margin: 25px 0; min-height: 50px;"></div>
+
+                        <!-- Status Display -->
+                        <div id="payment-status" style="
+                            margin-top: 20px;
+                            padding: 10px;
+                            border-radius: 5px;
+                            display: block;
+                        ">${statusMessage}</div>
+
+                        <!-- Cancel Button -->
+                        <button onclick="closePaymentModal()" style="
+                            background: #f1f1f1;
+                            color: #333;
+                            border: none;
+                            padding: 12px 24px;
+                            border-radius: 5px;
+                            cursor: pointer;
+                            margin-top: 15px;
+                            font-size: 16px;
+                        ">Cancel</button>
+                    </div>
+                </div>
+            `;
+
+            // Add modal to DOM
+            document.body.insertAdjacentHTML('beforeend', modalHTML);
+
+            // Update status
+            showPaymentStatus(statusMessage, statusType);
+        }
+
+        // Initialize PayPal checkout
+        function initializePayPalCheckout(creatorOrderId) {
+            // Check if PayPal SDK is available
+            if (typeof paypal !== 'undefined' && paypal.Buttons) {
+                console.log('✅ PayPal SDK available - initializing checkout');
+                
+                paypal.Buttons({
+                    // Use the creator order ID from server
+                    createOrder: function() {
+                        return creatorOrderId;
+                    },
                     
-                    // ADDED: Track dual transaction success
-                    gtag('event', 'dual_transaction_complete', {
-                        transaction_id: currentPaymentData.transactionId,
-                        creator_name: environment.creatorUsername || 'platform',
-                        project_name: environment.projectName || 'main',
-                        creator_amount: currentPaymentData.creatorAmount,
-                        platform_amount: currentPaymentData.platformAmount
-                    });
+                    // Handle approval and trigger server-side capture
+                    onApprove: async function(data, actions) {
+                        try {
+                            showPaymentStatus('Processing dual transaction...', 'info');
+
+                            // Call server-side function to capture both payments
+                            const capturePayment = functions.httpsCallable('capturePayment');
+                            const result = await capturePayment({
+                                creatorOrderId: currentPaymentData.creatorOrderId,
+                                platformOrderId: currentPaymentData.platformOrderId,
+                                dualTransactionId: currentPaymentData.dualTransactionId
+                            });
+
+                            if (result.data.success) {
+                                console.log('✅ Dual transaction completed:', result.data);
+                                
+                                // Track successful payment
+                                gtag('event', 'purchase', {
+                                    currency: 'USD',
+                                    value: currentPaymentData.totalAmount,
+                                    transaction_id: currentPaymentData.transactionId,
+                                    creator_order_id: result.data.creatorOrderId,
+                                    platform_order_id: result.data.platformOrderId
+                                });
+
+                                showPaymentStatus('✅ Dual transaction successful!', 'success');
+
+                                setTimeout(() => {
+                                    closePaymentModal();
+                                    if (unityInstance) {
+                                        // Send transaction details back to Unity
+                                        unityInstance.SendMessage('PayPalDualTransaction', 'OnTransactionDetails', JSON.stringify({
+                                            creatorTransactionId: result.data.creatorOrderId,
+                                            platformTransactionId: result.data.platformOrderId,
+                                            creatorAmount: result.data.creatorAmount,
+                                            platformAmount: result.data.platformAmount,
+                                            totalAmount: result.data.totalAmount
+                                        }));
+                                        
+                                        unityInstance.SendMessage('PayPalDualTransaction', 'OnPaymentComplete', 'true');
+                                    }
+                                }, 2000);
+
+                            } else {
+                                throw new Error(result.data.errors ? result.data.errors.join(', ') : 'Dual transaction failed');
+                            }
+
+                        } catch (error) {
+                            console.error('❌ Failed to capture dual transaction:', error);
+                            showPaymentStatus('❌ Payment processing failed', 'error');
+                            
+                            setTimeout(() => {
+                                closePaymentModal();
+                                if (unityInstance) {
+                                    unityInstance.SendMessage('PayPalDualTransaction', 'OnPaymentComplete', 'false');
+                                }
+                            }, 3000);
+                        }
+                    },
                     
-                    showPaymentStatus('✅ Payment successful! Funds distributed.', 'success');
+                    onError: function(err) {
+                        console.error('❌ PayPal error:', err);
+                        showPaymentStatus('Payment failed. Please try again.', 'error');
+                        
+                        setTimeout(() => {
+                            closePaymentModal();
+                            if (unityInstance) {
+                                unityInstance.SendMessage('PayPalDualTransaction', 'OnPaymentComplete', 'false');
+                            }
+                        }, 3000);
+                    },
                     
-                    setTimeout(() => {
+                    onCancel: function() {
+                        console.log('Payment cancelled by user');
                         closePaymentModal();
                         if (unityInstance) {
-                            unityInstance.SendMessage('PayPalDualTransaction', 'OnPaymentComplete', 'true');
+                            unityInstance.SendMessage('PayPalDualTransaction', 'OnPaymentComplete', 'false');
                         }
-                    }, 2000);
-                    
-                } else {
-                    throw new Error(result.data?.message || 'Dual transaction failed');
-                }
-
-            } catch (error) {
-                console.error('❌ Dual transaction failed:', error);
+                    }
+                }).render('#paypal-button-container');
                 
-                // ADDED: Track dual transaction failure
-                gtag('event', 'dual_transaction_failed', {
-                    error_message: error.message,
-                    creator_name: environment.creatorUsername || 'platform',
-                    project_name: environment.projectName || 'main'
-                });
+            } else {
+                console.error('❌ PayPal SDK not available');
+                showPaymentStatus('PayPal is not available. Please refresh and try again.', 'error');
                 
-                showPaymentStatus('❌ Transaction processing failed: ' + error.message, 'error');
+                setTimeout(() => {
+                    closePaymentModal();
+                    if (unityInstance) {
+                        unityInstance.SendMessage('PayPalDualTransaction', 'OnPaymentComplete', 'false');
+                    }
+                }, 3000);
             }
         }
 
+        // Helper functions
         function showPaymentStatus(message, type) {
-            const detailsDiv = document.getElementById('payment-details');
-            const statusDiv = document.createElement('div');
-            statusDiv.style.cssText = `
-                padding: 15px;
-                margin: 15px 0;
-                border-radius: 5px;
-                font-weight: bold;
-                ${type === 'success' ? 'background: #d4edda; color: #155724; border: 1px solid #c3e6cb;' : ''}
-                ${type === 'error' ? 'background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb;' : ''}
-                ${type === 'info' ? 'background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb;' : ''}
-            `;
-            statusDiv.textContent = message;
-            
-            // Replace existing status or add new one
-            const existingStatus = detailsDiv.querySelector('.status-message');
-            if (existingStatus) {
-                existingStatus.replaceWith(statusDiv);
-            } else {
-                statusDiv.className = 'status-message';
-                detailsDiv.appendChild(statusDiv);
+            const statusDiv = document.getElementById('payment-status');
+            if (statusDiv) {
+                statusDiv.style.display = 'block';
+                statusDiv.textContent = message;
+                statusDiv.style.background = 
+                    type === 'success' ? '#d4edda' :
+                    type === 'error' ? '#f8d7da' : '#d1ecf1';
+                statusDiv.style.color = 
+                    type === 'success' ? '#155724' :
+                    type === 'error' ? '#721c24' : '#0c5460';
+                statusDiv.style.border = 
+                    type === 'success' ? '1px solid #c3e6cb' :
+                    type === 'error' ? '1px solid #f5c6cb' : '1px solid #bee5eb';
             }
+        }
+
+        function getCreatorEmailFromURL() {
+            const urlParams = new URLSearchParams(window.location.search);
+            return urlParams.get('creator_email') || 
+                   urlParams.get('paypal_email') ||
+                   null;
         }
 
         function closePaymentModal() {
-            document.getElementById('paymentModal').style.display = 'none';
+            const modal = document.getElementById('paymentModal');
+            if (modal) {
+                modal.remove();
+            }
             currentPaymentData = null;
         }
 
@@ -788,7 +874,6 @@
         
         // No authentication required for dual transactions
         window.UnityCheckAuthenticationStatus = function() {
-            // ADDED: Track authentication check
             gtag('event', 'auth_check', {
                 creator_name: environment.creatorUsername || 'platform',
                 project_name: environment.projectName || 'main',
@@ -804,7 +889,6 @@
         window.UnityRequestPayment = function(contentId, amount) {
             console.log('🔄 Legacy payment request redirected to dual transaction');
             
-            // ADDED: Track legacy payment redirect
             gtag('event', 'legacy_payment_redirect', {
                 content_id: contentId,
                 amount: amount,
@@ -824,7 +908,6 @@
         window.UnityCallTestFunction = function() {
             console.log('🧪 Unity test function called');
 
-            // ADDED: Track test function calls
             gtag('event', 'unity_test_function', {
                 creator_name: environment.creatorUsername || 'platform',
                 project_name: environment.projectName || 'main'
@@ -836,7 +919,6 @@
                     .then((result) => {
                         console.log('✅ Test function result:', result.data);
                         
-                        // ADDED: Track successful test
                         gtag('event', 'unity_test_success', {
                             creator_name: environment.creatorUsername || 'platform',
                             project_name: environment.projectName || 'main'
@@ -849,7 +931,6 @@
                     .catch((error) => {
                         console.error('❌ Test function failed:', error);
                         
-                        // ADDED: Track failed test
                         gtag('event', 'unity_test_failed', {
                             error_message: error.message,
                             creator_name: environment.creatorUsername || 'platform',
@@ -863,7 +944,6 @@
             } else {
                 console.log('⚠️ Firebase Functions not available');
                 
-                // ADDED: Track Firebase unavailable
                 gtag('event', 'firebase_unavailable', {
                     creator_name: environment.creatorUsername || 'platform',
                     project_name: environment.projectName || 'main'
@@ -875,11 +955,10 @@
             }
         };
 
-        // ADDED: Custom download tracking function for your existing trackDownload calls
+        // ADDED: Custom download tracking function
         window.trackDownload = function(source) {
             console.log('📥 Template download tracked:', source);
             
-            // Send to GA4 with enhanced tracking
             gtag('event', 'file_download', {
                 file_name: 'u3d-template',
                 download_source: source,
@@ -896,7 +975,6 @@
                 canvas.width = window.innerWidth;
                 canvas.height = window.innerHeight;
                 
-                // ADDED: Track resize events for analytics
                 gtag('event', 'unity_canvas_resize', {
                     new_width: window.innerWidth,
                     new_height: window.innerHeight,
@@ -935,7 +1013,6 @@
                     .then(function(registration) {
                         console.log('ServiceWorker registration successful');
                         
-                        // ADDED: Track service worker success
                         gtag('event', 'service_worker_registered', {
                             creator_name: environment.creatorUsername || 'platform',
                             project_name: environment.projectName || 'main'
@@ -944,7 +1021,6 @@
                     .catch(function(err) {
                         console.log('ServiceWorker registration failed: ', err);
                         
-                        // ADDED: Track service worker failure
                         gtag('event', 'service_worker_failed', {
                             error_message: err.message,
                             creator_name: environment.creatorUsername || 'platform',
@@ -954,9 +1030,7 @@
             });
         }
 
-        // ADDED: Track page engagement and interactions
-        
-        // Track time spent on page
+        // Page engagement tracking
         let pageStartTime = Date.now();
         let engagementTracked = false;
         
@@ -985,7 +1059,7 @@
                     creator_name: environment.creatorUsername || 'platform',
                     project_name: environment.projectName || 'main'
                 });
-                pageStartTime = Date.now(); // Reset timer
+                pageStartTime = Date.now();
             }
         });
 
@@ -998,21 +1072,20 @@
             });
         });
 
-        // RESTORED: Initialize Firebase and load Unity
+        // Initialize Firebase and load Unity
         initializeFirebase();
 
         console.log('💳 Dual Transaction WebGL Template loaded');
         console.log('🎯 Revenue split: 95% Creator, 5% Platform');
-        console.log('🚀 No login required - direct payment processing');
-        console.log('🌐 Professional URL support restored');
+        console.log('🚀 Server-side processing - WebGL compatible');
+        console.log('🌐 Professional URL support enabled');
         console.log('📊 GA4 Analytics tracking enabled');
         
-        // ADDED: Track template initialization
         gtag('event', 'template_initialized', {
-            template_version: 'sophisticated_v2025',
+            template_version: 'server_side_v2025',
             creator_name: environment.creatorUsername || 'platform',
             project_name: environment.projectName || 'main',
-            features: ['dual_transactions', 'firebase', 'pwa', 'ga4_tracking']
+            features: ['dual_transactions', 'firebase', 'pwa', 'ga4_tracking', 'server_side_paypal']
         });
     </script>
 </body>
