@@ -325,6 +325,45 @@
         let functions = null;
         let currentPaymentData = null;
 
+        // CRITICAL FIX: Helper function to send results back to Unity using correct GameObject name
+        function sendUnityPaymentResult(success, transactionDetails = null) {
+            if (!unityInstance) {
+                console.warn('⚠️ Unity instance not available');
+                return;
+            }
+
+            // Use the stored GameObject name from the .jslib plugin
+            const gameObjectName = window.currentPayPalGameObject;
+            
+            if (!gameObjectName) {
+                console.error('❌ No GameObject name stored - cannot send result to Unity');
+                console.error('❌ Make sure you are using UnityStartDualTransactionWithGameObject');
+                console.error('❌ GameObject names for PayPal tools: Purchase Button, Tip Jar, Scene Gate, etc.');
+                return;
+            }
+
+            console.log(`✅ Sending payment result to GameObject: "${gameObjectName}"`);
+
+            try {
+                // Send payment completion status
+                unityInstance.SendMessage(gameObjectName, 'OnPaymentComplete', success);
+                
+                // Send transaction details if available
+                if (success === 'true' && transactionDetails) {
+                    unityInstance.SendMessage(gameObjectName, 'OnTransactionDetails', JSON.stringify(transactionDetails));
+                }
+                
+                console.log(`✅ Successfully sent payment result to Unity GameObject: ${gameObjectName}`);
+                
+            } catch (error) {
+                console.error(`❌ Failed to send message to GameObject "${gameObjectName}":`, error);
+                console.error('❌ Common causes:');
+                console.error('   • GameObject was destroyed');
+                console.error('   • GameObject name changed');
+                console.error('   • PayPalDualTransaction component missing');
+            }
+        }
+
         // RESTORED: SECURE Firebase configuration fetching from backend
         async function initializeFirebase() {
             try {
@@ -424,11 +463,11 @@
             }
 
             var buildUrl = "Build";
-            var loaderUrl = buildUrl + "/3baadd484050fd18bd47c9ea08f59e10.loader.js?v=1753844851918";
+            var loaderUrl = buildUrl + "/3baadd484050fd18bd47c9ea08f59e10.loader.js?v=1753895632903";
             var config = {
-                dataUrl: buildUrl + "/f51581a7a7307b6a4a781d053f2b3d28.data?v=1753844851918",
-                frameworkUrl: buildUrl + "/b013af16a99fd18e3f39a9d5ee1bca0c.framework.js?v=1753844851918",
-                codeUrl: buildUrl + "/5889679e1dfa4f9b0712a74b44499320.wasm?v=1753844851918",
+                dataUrl: buildUrl + "/e99e2b21748c4aa9856652b11cc5cc22.data?v=1753895632903",
+                frameworkUrl: buildUrl + "/b013af16a99fd18e3f39a9d5ee1bca0c.framework.js?v=1753895632903",
+                codeUrl: buildUrl + "/5889679e1dfa4f9b0712a74b44499320.wasm?v=1753895632903",
                 streamingAssetsUrl: "StreamingAssets",
                 companyName: "spacedolphin",
                 productName: "spacedolphin's Unity Experience",
@@ -541,9 +580,8 @@
                 if (!creatorEmail) {
                     console.error('❌ Creator PayPal email not found');
                     showPaymentStatus('Creator payment email not configured', 'error');
-                    if (unityInstance) {
-                        unityInstance.SendMessage('PayPalDualTransaction', 'OnPaymentComplete', 'false');
-                    }
+                    // FIXED: Use helper function instead of hardcoded SendMessage
+                    sendUnityPaymentResult('false');
                     return;
                 }
 
@@ -575,9 +613,8 @@
                     project_name: environment.projectName || 'main'
                 });
                 
-                if (unityInstance) {
-                    unityInstance.SendMessage('PayPalDualTransaction', 'OnPaymentComplete', 'false');
-                }
+                // FIXED: Use helper function instead of hardcoded SendMessage
+                sendUnityPaymentResult('false');
             }
         };
 
@@ -627,9 +664,8 @@
                 
                 setTimeout(() => {
                     closePaymentModal();
-                    if (unityInstance) {
-                        unityInstance.SendMessage('PayPalDualTransaction', 'OnPaymentComplete', 'false');
-                    }
+                    // FIXED: Use helper function instead of hardcoded SendMessage
+                    sendUnityPaymentResult('false');
                 }, 3000);
             }
         }
@@ -769,18 +805,14 @@
 
                                 setTimeout(() => {
                                     closePaymentModal();
-                                    if (unityInstance) {
-                                        // Send transaction details back to Unity
-                                        unityInstance.SendMessage('PayPalDualTransaction', 'OnTransactionDetails', JSON.stringify({
-                                            creatorTransactionId: result.data.creatorOrderId,
-                                            platformTransactionId: result.data.platformOrderId,
-                                            creatorAmount: result.data.creatorAmount,
-                                            platformAmount: result.data.platformAmount,
-                                            totalAmount: result.data.totalAmount
-                                        }));
-                                        
-                                        unityInstance.SendMessage('PayPalDualTransaction', 'OnPaymentComplete', 'true');
-                                    }
+                                    // FIXED: Use helper function with transaction details
+                                    sendUnityPaymentResult('true', {
+                                        creatorTransactionId: result.data.creatorOrderId,
+                                        platformTransactionId: result.data.platformOrderId,
+                                        creatorAmount: result.data.creatorAmount,
+                                        platformAmount: result.data.platformAmount,
+                                        totalAmount: result.data.totalAmount
+                                    });
                                 }, 2000);
 
                             } else {
@@ -793,9 +825,8 @@
                             
                             setTimeout(() => {
                                 closePaymentModal();
-                                if (unityInstance) {
-                                    unityInstance.SendMessage('PayPalDualTransaction', 'OnPaymentComplete', 'false');
-                                }
+                                // FIXED: Use helper function instead of hardcoded SendMessage
+                                sendUnityPaymentResult('false');
                             }, 3000);
                         }
                     },
@@ -806,18 +837,16 @@
                         
                         setTimeout(() => {
                             closePaymentModal();
-                            if (unityInstance) {
-                                unityInstance.SendMessage('PayPalDualTransaction', 'OnPaymentComplete', 'false');
-                            }
+                            // FIXED: Use helper function instead of hardcoded SendMessage
+                            sendUnityPaymentResult('false');
                         }, 3000);
                     },
                     
                     onCancel: function() {
                         console.log('Payment cancelled by user');
                         closePaymentModal();
-                        if (unityInstance) {
-                            unityInstance.SendMessage('PayPalDualTransaction', 'OnPaymentComplete', 'false');
-                        }
+                        // FIXED: Use helper function instead of hardcoded SendMessage
+                        sendUnityPaymentResult('false');
                     }
                 }).render('#paypal-button-container');
                 
@@ -827,9 +856,8 @@
                 
                 setTimeout(() => {
                     closePaymentModal();
-                    if (unityInstance) {
-                        unityInstance.SendMessage('PayPalDualTransaction', 'OnPaymentComplete', 'false');
-                    }
+                    // FIXED: Use helper function instead of hardcoded SendMessage
+                    sendUnityPaymentResult('false');
                 }, 3000);
             }
         }
@@ -869,16 +897,34 @@
 
         // ===== UNITY BRIDGE FUNCTIONS (SIMPLIFIED) WITH GA4 TRACKING =====
         
-        // No authentication required for dual transactions
+        // FIXED: No authentication required for dual transactions but use stored GameObject name
         window.UnityCheckAuthenticationStatus = function() {
+            console.log('🔍 Checking authentication status');
+            
             gtag('event', 'auth_check', {
                 creator_name: environment.creatorUsername || 'platform',
                 project_name: environment.projectName || 'main',
                 auth_required: false
             });
             
-            if (unityInstance) {
-                unityInstance.SendMessage('PayPalDualTransaction', 'OnAuthenticationChecked', 'true');
+            if (!unityInstance) {
+                console.warn('⚠️ Unity instance not available');
+                return;
+            }
+
+            const gameObjectName = window.currentPayPalGameObject;
+            
+            if (!gameObjectName) {
+                console.error('❌ No GameObject name stored for authentication callback');
+                return;
+            }
+
+            try {
+                // For dual transactions, no auth is required - always return true
+                unityInstance.SendMessage(gameObjectName, 'OnAuthenticationChecked', 'true');
+                console.log(`✅ Sent authentication status to GameObject: ${gameObjectName}`);
+            } catch (error) {
+                console.error(`❌ Failed to send authentication status to GameObject "${gameObjectName}":`, error);
             }
         };
 
@@ -963,6 +1009,22 @@
                 project_name: environment.projectName || 'main',
                 template_version: 'latest'
             });
+        };
+
+        // ADDED: Debug helper to check GameObject name storage
+        window.debugPayPalGameObject = function() {
+            const gameObjectName = window.currentPayPalGameObject;
+            console.log('🔍 Debug: Current PayPal GameObject name:', gameObjectName || 'NOT SET');
+            
+            if (!gameObjectName) {
+                console.warn('⚠️ No GameObject name stored!');
+                console.warn('⚠️ Make sure Unity calls UnityStartDualTransactionWithGameObject');
+                console.warn('⚠️ This will cause "SendMessage: object not found!" errors');
+            } else {
+                console.log('✅ GameObject name is properly stored for SendMessage calls');
+            }
+            
+            return gameObjectName;
         };
 
         // Responsive canvas handling
@@ -1077,12 +1139,13 @@
         console.log('🚀 Server-side processing - WebGL compatible');
         console.log('🌐 Professional URL support enabled');
         console.log('📊 GA4 Analytics tracking enabled');
+        console.log('🔧 FIXED: SendMessage uses stored GameObject names');
         
         gtag('event', 'template_initialized', {
-            template_version: 'server_side_v2025',
+            template_version: 'server_side_v2025_fixed_sendmessage',
             creator_name: environment.creatorUsername || 'platform',
             project_name: environment.projectName || 'main',
-            features: ['dual_transactions', 'firebase', 'pwa', 'ga4_tracking', 'server_side_paypal']
+            features: ['dual_transactions', 'firebase', 'pwa', 'ga4_tracking', 'server_side_paypal', 'fixed_gameobject_sendmessage']
         });
     </script>
 </body>
