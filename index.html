@@ -202,19 +202,25 @@
         function checkPayPalBridgeReady() {
             return new Promise((resolve) => {
                 let attempts = 0;
-                const maxAttempts = 30;
+                const maxAttempts = 60; // Increased to 30 seconds
                 
                 const checkInterval = setInterval(() => {
                     attempts++;
                     
-                    if (window.paypalPlatformBridgeReady) {
+                    // Check multiple indicators that PayPal bridge is ready
+                    if (window.paypalPlatformBridgeReady || 
+                        window.paypalSDKReady || 
+                        (typeof window.StartDirectPayPalDualTransaction === 'function' && 
+                         window.StartDirectPayPalDualTransaction !== arguments.callee)) {
                         clearInterval(checkInterval);
                         console.log('✅ PayPal bridge ready');
                         resolve(true);
                     } else if (attempts >= maxAttempts) {
                         clearInterval(checkInterval);
-                        console.warn('⚠️ PayPal bridge not loaded');
+                        console.warn('⚠️ PayPal bridge not loaded after 30 seconds');
                         resolve(false);
+                    } else if (attempts % 10 === 0) {
+                        console.log(`⏳ Waiting for PayPal bridge... (${ attempts * 0.5 }s)`);
                     }
                 }, 500);
             });
@@ -250,29 +256,65 @@
 
         // Placeholder functions - will be overridden by PayPal bridge
         window.StartDirectPayPalDualTransaction = function(paymentData) {
-            console.log('💳 PayPal transaction requested');
+            console.log('💳 PayPal transaction requested - checking bridge availability...');
             
             checkPayPalBridgeReady().then((ready) => {
-                if (ready && window.StartDirectPayPalDualTransaction !== arguments.callee) {
-                    window.StartDirectPayPalDualTransaction(paymentData);
+                if (ready) {
+                    // Try to call the actual function if it was overridden
+                    if (typeof window.StartDirectPayPalDualTransaction === 'function' && 
+                        window.StartDirectPayPalDualTransaction !== arguments.callee) {
+                        console.log('✅ PayPal bridge loaded, calling actual function');
+                        window.StartDirectPayPalDualTransaction(paymentData);
+                    } else if (window.paypalSDKReady && typeof paypal !== 'undefined') {
+                        console.log('✅ PayPal SDK available directly');
+                        // Use direct PayPal if available
+                        if (typeof window.initializePayPalCheckout === 'function') {
+                            window.currentPaymentData = paymentData;
+                            window.initializePayPalCheckout();
+                        } else {
+                            console.error('❌ PayPal functions not available');
+                            sendUnityPaymentResult('false');
+                        }
+                    } else {
+                        console.error('❌ PayPal bridge ready but functions not available');
+                        sendUnityPaymentResult('false');
+                    }
                 } else {
-                    console.error('❌ PayPal bridge not available');
+                    console.error('❌ PayPal bridge not available after waiting');
+                    console.error('❌ Check that Load Balancer is injecting PayPal script');
                     sendUnityPaymentResult('false');
                 }
+            }).catch((error) => {
+                console.error('❌ Error checking PayPal bridge:', error);
+                sendUnityPaymentResult('false');
             });
         };
 
         window.TestDirectPayPalConnection = function(gameObjectName) {
-            console.log('🧪 PayPal connection test requested');
+            console.log('🧪 PayPal connection test requested - checking bridge...');
             
             checkPayPalBridgeReady().then((ready) => {
-                if (ready && window.TestDirectPayPalConnection !== arguments.callee) {
-                    window.TestDirectPayPalConnection(gameObjectName);
+                if (ready) {
+                    if (typeof window.TestDirectPayPalConnection === 'function' && 
+                        window.TestDirectPayPalConnection !== arguments.callee) {
+                        console.log('✅ Calling actual PayPal test function');
+                        window.TestDirectPayPalConnection(gameObjectName);
+                    } else {
+                        console.log('✅ PayPal bridge ready, sending success');
+                        if (unityInstance) {
+                            unityInstance.SendMessage(gameObjectName, 'OnConnectionTestComplete', 'true');
+                        }
+                    }
                 } else {
-                    console.error('❌ PayPal bridge not available');
+                    console.error('❌ PayPal bridge not available for testing');
                     if (unityInstance) {
                         unityInstance.SendMessage(gameObjectName, 'OnConnectionTestComplete', 'false');
                     }
+                }
+            }).catch((error) => {
+                console.error('❌ Error in PayPal connection test:', error);
+                if (unityInstance) {
+                    unityInstance.SendMessage(gameObjectName, 'OnConnectionTestComplete', 'false');
                 }
             });
         };
@@ -320,11 +362,11 @@
             }
 
             var buildUrl = "Build";
-            var loaderUrl = buildUrl + "/902b3f15727e279b2761c4e21be1d5cd.loader.js?v=1753942725215";
+            var loaderUrl = buildUrl + "/902b3f15727e279b2761c4e21be1d5cd.loader.js?v=1753944375370";
             var config = {
-                dataUrl: buildUrl + "/fccc240915b596dfbfc880612acb691d.data?v=1753942725215",
-                frameworkUrl: buildUrl + "/77161e56f6f501b78a5ffe994ec5a338.framework.js?v=1753942725215",
-                codeUrl: buildUrl + "/0a0f129faaa920ce47524ac02bc23fd3.wasm?v=1753942725215",
+                dataUrl: buildUrl + "/798e3d62e2eb39691c6302355df062c2.data?v=1753944375370",
+                frameworkUrl: buildUrl + "/77161e56f6f501b78a5ffe994ec5a338.framework.js?v=1753944375370",
+                codeUrl: buildUrl + "/0a0f129faaa920ce47524ac02bc23fd3.wasm?v=1753944375370",
                 streamingAssetsUrl: "StreamingAssets",
                 companyName: "spacedolphin",
                 productName: "spacedolphin's Unity Experience",
