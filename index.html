@@ -21,7 +21,7 @@
     </script>
 
     <!-- DIRECT PayPal SDK for Orders v2 API (NO Firebase Functions required) -->
-    <script src="https://www.paypal.com/sdk/js?client-id=AdgxrQPKeqcirWWUi7HeoPUWGGCs01AxKZnjkKmv8ITkdiWM2N7ABp-jEYNLmQXIy1qfHvqm4JWydSon&currency=USD"></script>
+    <script src="https://www.paypal.com/sdk/js?client-id=AYzvvkNEMk6gCSy64CRQgOU2I1e-QincFjkzzppAXQw-3rs4VRrFyxF3OOwO8IcR3qjFCd2cpJKaOxZM&currency=USD"></script>
 
     <style>
         html, body {
@@ -308,10 +308,10 @@
 
         // DIRECT PayPal Orders v2 API Configuration
         const PAYPAL_CONFIG = {
-            CLIENT_ID: 'AdgxrQPKeqcirWWUi7HeoPUWGGCs01AxKZnjkKmv8ITkdiWM2N7ABp-jEYNLmQXIy1qfHvqm4JWydSon',
+            CLIENT_ID: 'AYzvvkNEMk6gCSy64CRQgOU2I1e-QincFjkzzppAXQw-3rs4VRrFyxF3OOwO8IcR3qjFCd2cpJKaOxZM',
             PLATFORM_EMAIL: 'laurie@unreality3d.com',
             CURRENCY: 'USD',
-            ENVIRONMENT: 'sandbox' // Change to 'production' for live payments
+            ENVIRONMENT: 'production' 
         };
 
         // Helper function to send results back to Unity using correct GameObject name
@@ -792,11 +792,11 @@
             }
 
             var buildUrl = "Build";
-            var loaderUrl = buildUrl + "/902b3f15727e279b2761c4e21be1d5cd.loader.js?v=1753914011434";
+            var loaderUrl = buildUrl + "/902b3f15727e279b2761c4e21be1d5cd.loader.js?v=1753925875356";
             var config = {
-                dataUrl: buildUrl + "/4900d9fb801f83c48fe5da3c1a021569.data?v=1753914011434",
-                frameworkUrl: buildUrl + "/77161e56f6f501b78a5ffe994ec5a338.framework.js?v=1753914011434",
-                codeUrl: buildUrl + "/0a0f129faaa920ce47524ac02bc23fd3.wasm?v=1753914011434",
+                dataUrl: buildUrl + "/44039f5bf9f6d1de5c2676127b3e2fda.data?v=1753925875356",
+                frameworkUrl: buildUrl + "/77161e56f6f501b78a5ffe994ec5a338.framework.js?v=1753925875356",
+                codeUrl: buildUrl + "/0a0f129faaa920ce47524ac02bc23fd3.wasm?v=1753925875356",
                 streamingAssetsUrl: "StreamingAssets",
                 companyName: "spacedolphin",
                 productName: "spacedolphin's Unity Experience",
