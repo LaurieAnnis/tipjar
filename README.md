@@ -59,14 +59,14 @@ This is an interactive Unity WebGL experience created using the [Unreality3D Pla
 This experience was created using **[Unreality3D](https://unreality3d.com)** - The world's most creator-friendly 3D content platform.
 
 ### 🎯 Want to Create Your Own?
-- **Download SDK**: [Get Unity Template](https://unreality3d.com/download-template)
+- **Download template Unity project**: [Get U3D Template](https://unreality3d.com/download-template)
 - **Documentation**: [Platform Docs](https://unreality3d.com/docs)
 - **Creator Dashboard**: [Unity Menu > U3D](https://unreality3d.com)
 
 ### 🔧 Platform Features
-- **Zero Setup**: Download template, build, deploy
+- **Zero Setup**: Download template project, build, deploy
 - **Professional URLs**: Custom Unreality3D subdomains for every creator
-- **PayPal Transactions**: Built-in monetization system  
+- **PayPal Transactions**: Platform-hosted PayPal transactions  
 - **Automatic Deployment**: Firebase Functions + Git operations to GitHub Pages
 - **Performance**: Optimized for fast loading and smooth gameplay
 
